@@ -2,6 +2,8 @@ package com.lszczepanski.fuelconsumptionlog
 
 import com.lszczepanski.fuelconsumptionlog.domain.model.CarDraft
 import com.lszczepanski.fuelconsumptionlog.domain.model.CarDraftValidator
+import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelDraft
+import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelDraftValidator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,6 +41,31 @@ class SharedCommonTest {
         )
 
         val result = CarDraftValidator.validate(draft)
+
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun allowsDraftWithoutFuelLiters() {
+        val draft = RefuelDraft(
+            fuelLiters = "",
+            odometerKm = "221000",
+        )
+
+        val result = RefuelDraftValidator.validate(draft, saveAsDraft = true)
+
+        assertTrue(result.isSuccess)
+        assertTrue(result.getOrThrow().isDraft)
+    }
+
+    @Test
+    fun requiresFuelLitersForFinalSave() {
+        val draft = RefuelDraft(
+            fuelLiters = "",
+            odometerKm = "221000",
+        )
+
+        val result = RefuelDraftValidator.validate(draft, saveAsDraft = false)
 
         assertTrue(result.isFailure)
     }

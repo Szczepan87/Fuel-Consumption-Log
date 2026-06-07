@@ -4,11 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +40,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 fun CarsScreen(
     repository: CarRepository,
+    onCarSelected: (Long) -> Unit,
 ) {
     val cars by repository.observeCars().collectAsState(initial = emptyList())
     var isDialogOpen by remember { mutableStateOf(false) }
@@ -60,7 +63,7 @@ fun CarsScreen(
         },
     ) { padding ->
         if (cars.isEmpty()) {
-            Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+            Column(modifier = Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
                 Text("Brak zapisanych samochodow.")
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Kliknij +, aby dodac pierwszy samochod.")
@@ -72,7 +75,10 @@ fun CarsScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
                 items(cars, key = { it.id }) { car ->
-                    CarRow(car)
+                    CarRow(
+                        car = car,
+                        onClick = { onCarSelected(car.id) },
+                    )
                 }
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
@@ -111,8 +117,15 @@ fun CarsScreen(
 }
 
 @Composable
-private fun CarRow(car: Car) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun CarRow(
+    car: Car,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("${car.brand} ${car.model}", style = MaterialTheme.typography.titleMedium)
             Text(car.registrationNumber, style = MaterialTheme.typography.bodyMedium)

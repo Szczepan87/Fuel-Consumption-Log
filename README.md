@@ -42,6 +42,9 @@ Project now includes the first fuel-log module:
 - Cars list screen in Compose Multiplatform.
 - Floating action button for adding a car.
 - Add-car popup dialog with input validation.
+- Unique validation of registration number.
+- Car details screen with summary card, total average fuel consumption and refuel history (newest first).
+- Refuel dialog with quick add button, draft/final save modes and edit support (odometer is immutable after save).
 - SQLDelight persistence with platform drivers for Android, iOS and Desktop.
 
 ### Quick try
