@@ -1,0 +1,31 @@
+CREATE TABLE cars (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    brand TEXT NOT NULL,
+    model TEXT NOT NULL,
+    engine_capacity_cm3 INTEGER NOT NULL,
+    horse_power INTEGER NOT NULL,
+    registration_number TEXT NOT NULL UNIQUE,
+    mileage_km INTEGER NOT NULL
+);
+
+selectAllCars:
+SELECT *
+FROM cars
+ORDER BY brand, model;
+
+selectByRegistration:
+SELECT *
+FROM cars
+WHERE registration_number = ?;
+
+insertCar:
+INSERT INTO cars(
+    brand,
+    model,
+    engine_capacity_cm3,
+    horse_power,
+    registration_number,
+    mileage_km
+)
+VALUES (?, ?, ?, ?, ?, ?);
+
