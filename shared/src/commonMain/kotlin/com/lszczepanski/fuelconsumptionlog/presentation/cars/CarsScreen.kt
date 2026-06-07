@@ -24,45 +24,30 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.lszczepanski.fuelconsumptionlog.data.local.CarRepository
 import com.lszczepanski.fuelconsumptionlog.domain.model.Car
 import com.lszczepanski.fuelconsumptionlog.domain.model.CarDraft
-import com.lszczepanski.fuelconsumptionlog.domain.model.CarDraftValidator
-import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun CarsScreen(
-    repository: CarRepository,
+    viewModel: CarsViewModel,
     onCarSelected: (Long) -> Unit,
 ) {
-    val cars by repository.observeCars().collectAsState(initial = emptyList())
-    var isDialogOpen by remember { mutableStateOf(false) }
-    var draft by remember { mutableStateOf(CarDraft()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val coroutineScope = rememberCoroutineScope()
+    val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Samochody") }) },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    isDialogOpen = true
-                    errorMessage = null
-                    draft = CarDraft()
-                }
+                onClick = viewModel::onAddCarClick
             ) {
                 Text("+")
             }
         },
     ) { padding ->
-        if (cars.isEmpty()) {
+        if (uiState.cars.isEmpty()) {
             Column(modifier = Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
                 Text("Brak zapisanych samochodow.")
                 Spacer(modifier = Modifier.height(8.dp))
@@ -74,7 +59,7 @@ fun CarsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
-                items(cars, key = { it.id }) { car ->
+                items(uiState.cars, key = { it.id }) { car ->
                     CarRow(
                         car = car,
                         onClick = { onCarSelected(car.id) },
@@ -85,33 +70,14 @@ fun CarsScreen(
         }
     }
 
-    if (isDialogOpen) {
+    if (uiState.isAddDialogOpen) {
         AddCarDialog(
-            draft = draft,
-            errorMessage = errorMessage,
-            onDismiss = { isDialogOpen = false },
-            onDraftChanged = { draft = it },
-            onSave = {
-                val inputResult = CarDraftValidator.validate(draft)
-                inputResult
-                    .onSuccess { input ->
-                        coroutineScope.launch {
-                            val saveResult = repository.addCar(input)
-                            saveResult
-                                .onSuccess {
-                                    isDialogOpen = false
-                                    draft = CarDraft()
-                                    errorMessage = null
-                                }
-                                .onFailure { error ->
-                                    errorMessage = error.message ?: "Nie udalo sie zapisac samochodu."
-                                }
-                        }
-                    }
-                    .onFailure { error ->
-                        errorMessage = error.message ?: "Nieprawidlowe dane formularza."
-                    }
-            },
+            draft = uiState.draft,
+            errorMessage = uiState.errorMessage,
+            isSaving = uiState.isSaving,
+            onDismiss = viewModel::onDismissDialog,
+            onDraftChanged = viewModel::onDraftChanged,
+            onSave = viewModel::onSaveCar,
         )
     }
 }
@@ -138,6 +104,7 @@ private fun CarRow(
 private fun AddCarDialog(
     draft: CarDraft,
     errorMessage: String?,
+    isSaving: Boolean,
     onDismiss: () -> Unit,
     onDraftChanged: (CarDraft) -> Unit,
     onSave: () -> Unit,
@@ -201,12 +168,12 @@ private fun AddCarDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onSave) {
+            TextButton(onClick = onSave, enabled = !isSaving) {
                 Text("Zapisz")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
                 Text("Anuluj")
             }
         },

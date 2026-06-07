@@ -25,10 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -36,42 +33,27 @@ import androidx.compose.ui.unit.dp
 import com.lszczepanski.fuelconsumptionlog.data.local.CarRepository
 import com.lszczepanski.fuelconsumptionlog.domain.model.Car
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelDraft
-import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelDraftValidator
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelEntry
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelInput
 import com.lszczepanski.fuelconsumptionlog.util.formatEpochMillis
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.math.round
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun CarDetailsScreen(
-    carId: Long,
-    repository: CarRepository,
+    viewModel: CarDetailsViewModel,
     onBack: () -> Unit,
 ) {
-    val car by repository.observeCarById(carId).collectAsState(initial = null)
-    val refuels by repository.observeRefuelsByCarId(carId).collectAsState(initial = emptyList())
-    val averageConsumption = remember(refuels) { calculateAverageConsumption(refuels) }
-
-    var isDialogOpen by remember { mutableStateOf(false) }
-    var editingRefuelId by remember { mutableStateOf<Long?>(null) }
-    var editingOdometerKm by remember { mutableStateOf<Int?>(null) }
-    var draft by remember { mutableStateOf(RefuelDraft()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    val coroutineScope = rememberCoroutineScope()
+    val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    val title = if (car == null) {
+                    val title = if (uiState.car == null) {
                         "Szczegoly samochodu"
                     } else {
-                        "${car!!.brand} ${car!!.model}"
+                        "${uiState.car!!.brand} ${uiState.car!!.model}"
                     }
                     Text(title)
                 },
@@ -84,19 +66,13 @@ fun CarDetailsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    editingRefuelId = null
-                    editingOdometerKm = null
-                    draft = RefuelDraft()
-                    errorMessage = null
-                    isDialogOpen = true
-                }
+                onClick = viewModel::onAddRefuelClick
             ) {
                 Text("+")
             }
         },
     ) { padding ->
-        if (car == null) {
+        if (uiState.car == null) {
             Column(modifier = Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
                 Text("Nie znaleziono samochodu.")
             }
@@ -108,13 +84,13 @@ fun CarDetailsScreen(
                 item { Spacer(modifier = Modifier.height(8.dp)) }
                 item {
                     CarHeaderCard(
-                        brand = car!!.brand,
-                        model = car!!.model,
-                        registration = car!!.registrationNumber,
-                        engineCapacity = car!!.engineCapacityCm3,
-                        horsePower = car!!.horsePower,
-                        mileageKm = car!!.mileageKm,
-                        averageConsumption = averageConsumption,
+                        brand = uiState.car!!.brand,
+                        model = uiState.car!!.model,
+                        registration = uiState.car!!.registrationNumber,
+                        engineCapacity = uiState.car!!.engineCapacityCm3,
+                        horsePower = uiState.car!!.horsePower,
+                        mileageKm = uiState.car!!.mileageKm,
+                        averageConsumption = uiState.averageConsumption,
                     )
                 }
                 item {
@@ -126,24 +102,15 @@ fun CarDetailsScreen(
                     )
                 }
 
-                if (refuels.isEmpty()) {
+                if (uiState.refuels.isEmpty()) {
                     item {
                         Text("Brak tankowan. Dodaj pierwsze tankowanie przyciskiem +.")
                     }
                 } else {
-                    items(refuels, key = { it.id }) { refuel ->
+                    items(uiState.refuels, key = { it.id }) { refuel ->
                         RefuelRow(
                             refuel = refuel,
-                            onClick = {
-                                editingRefuelId = refuel.id
-                                editingOdometerKm = refuel.odometerKm
-                                draft = RefuelDraft(
-                                    fuelLiters = refuel.fuelLiters?.toString() ?: "",
-                                    odometerKm = refuel.odometerKm.toString(),
-                                )
-                                errorMessage = null
-                                isDialogOpen = true
-                            },
+                            onClick = { viewModel.onEditRefuelClick(refuel) },
                         )
                     }
                 }
@@ -153,53 +120,15 @@ fun CarDetailsScreen(
         }
     }
 
-    if (isDialogOpen) {
-        val isEditing = editingRefuelId != null
-
+    if (uiState.isDialogOpen) {
         RefuelDialog(
-            draft = draft,
-            isEditing = isEditing,
-            errorMessage = errorMessage,
-            onDraftChanged = { draft = it },
-            onDismiss = { isDialogOpen = false },
-            onSave = { saveAsDraft ->
-                val draftToValidate = if (isEditing && editingOdometerKm != null) {
-                    draft.copy(odometerKm = editingOdometerKm!!.toString())
-                } else {
-                    draft
-                }
-
-                val validationResult = RefuelDraftValidator.validate(
-                    draft = draftToValidate,
-                    saveAsDraft = saveAsDraft,
-                )
-
-                validationResult
-                    .onSuccess { input ->
-                        coroutineScope.launch {
-                            val saveResult = if (editingRefuelId == null) {
-                                repository.addRefuel(carId = carId, input = input)
-                            } else {
-                                repository.updateRefuel(refuelId = editingRefuelId!!, input = input)
-                            }
-
-                            saveResult
-                                .onSuccess {
-                                    isDialogOpen = false
-                                    draft = RefuelDraft()
-                                    editingRefuelId = null
-                                    editingOdometerKm = null
-                                    errorMessage = null
-                                }
-                                .onFailure { error ->
-                                    errorMessage = error.message ?: "Nie udalo sie zapisac tankowania."
-                                }
-                        }
-                    }
-                    .onFailure { error ->
-                        errorMessage = error.message ?: "Nieprawidlowe dane tankowania."
-                    }
-            },
+            draft = uiState.draft,
+            isEditing = uiState.isEditing,
+            errorMessage = uiState.errorMessage,
+            isSaving = uiState.isSaving,
+            onDraftChanged = viewModel::onDraftChanged,
+            onDismiss = viewModel::onDismissDialog,
+            onSave = viewModel::onSaveRefuel,
         )
     }
 }
@@ -253,6 +182,7 @@ private fun RefuelDialog(
     draft: RefuelDraft,
     isEditing: Boolean,
     errorMessage: String?,
+    isSaving: Boolean,
     onDraftChanged: (RefuelDraft) -> Unit,
     onDismiss: () -> Unit,
     onSave: (Boolean) -> Unit,
@@ -298,40 +228,23 @@ private fun RefuelDialog(
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { onSave(true) }) {
+                TextButton(onClick = { onSave(true) }, enabled = !isSaving) {
                     Text("Zapisz draft")
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                TextButton(onClick = { onSave(false) }) {
+                TextButton(onClick = { onSave(false) }, enabled = !isSaving) {
                     Text("Zapisz")
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
                 Text("Anuluj")
             }
         },
     )
 }
 
-private fun calculateAverageConsumption(refuels: List<RefuelEntry>): Double? {
-    val completed = refuels
-        .filter { !it.isDraft && it.fuelLiters != null }
-        .sortedBy { it.odometerKm }
-
-    if (completed.size < 2) return null
-
-    val distanceKm = completed.last().odometerKm - completed.first().odometerKm
-    if (distanceKm <= 0) return null
-
-    var totalLiters = 0.0
-    for (index in 1 until completed.size) {
-        totalLiters += completed[index].fuelLiters ?: 0.0
-    }
-
-    return (totalLiters * 100.0) / distanceKm.toDouble()
-}
 
 @Preview
 @Composable
@@ -378,6 +291,7 @@ private fun RefuelDialogPreview() {
             ),
             isEditing = false,
             errorMessage = null,
+            isSaving = false,
             onDraftChanged = {},
             onDismiss = {},
             onSave = {},
@@ -388,57 +302,50 @@ private fun RefuelDialogPreview() {
 @Preview
 @Composable
 private fun CarDetailsScreenPreview() {
-    val carFlow = remember {
-        MutableStateFlow(
-            Car(
-                id = 1,
-                brand = "Skoda",
-                model = "Octavia",
-                engineCapacityCm3 = 1968,
-                horsePower = 150,
-                registrationNumber = "KR 1234A",
-                mileageKm = 182300,
-            )
-        )
-    }
-    val refuelsFlow = remember {
-        MutableStateFlow(
-            listOf(
-                RefuelEntry(
-                    id = 3,
-                    carId = 1,
-                    createdAtEpochMillis = 1_780_010_000_000,
-                    fuelLiters = 40.1,
-                    odometerKm = 182300,
-                    isDraft = false,
-                ),
-                RefuelEntry(
-                    id = 2,
-                    carId = 1,
-                    createdAtEpochMillis = 1_779_800_000_000,
-                    fuelLiters = null,
-                    odometerKm = 181900,
-                    isDraft = true,
-                ),
-                RefuelEntry(
-                    id = 1,
-                    carId = 1,
-                    createdAtEpochMillis = 1_779_500_000_000,
-                    fuelLiters = 41.6,
-                    odometerKm = 181500,
-                    isDraft = false,
-                ),
-            )
-        )
-    }
+    val previewCar = Car(
+        id = 1,
+        brand = "Skoda",
+        model = "Octavia",
+        engineCapacityCm3 = 1968,
+        horsePower = 150,
+        registrationNumber = "KR 1234A",
+        mileageKm = 182300,
+    )
+    val previewRefuels = listOf(
+        RefuelEntry(
+            id = 3,
+            carId = 1,
+            createdAtEpochMillis = 1_780_010_000_000,
+            fuelLiters = 40.1,
+            odometerKm = 182300,
+            isDraft = false,
+        ),
+        RefuelEntry(
+            id = 2,
+            carId = 1,
+            createdAtEpochMillis = 1_779_800_000_000,
+            fuelLiters = null,
+            odometerKm = 181900,
+            isDraft = true,
+        ),
+        RefuelEntry(
+            id = 1,
+            carId = 1,
+            createdAtEpochMillis = 1_779_500_000_000,
+            fuelLiters = 41.6,
+            odometerKm = 181500,
+            isDraft = false,
+        ),
+    )
 
     val previewRepository = remember {
         object : CarRepository {
-            override fun observeCars(): Flow<List<Car>> = MutableStateFlow(emptyList())
+            override suspend fun getCars(): List<Car> = listOf(previewCar)
 
-            override fun observeCarById(carId: Long): Flow<Car?> = carFlow
+            override suspend fun getCarById(carId: Long): Car? = previewCar.takeIf { it.id == carId }
 
-            override fun observeRefuelsByCarId(carId: Long): Flow<List<RefuelEntry>> = refuelsFlow
+            override suspend fun getRefuelsByCarId(carId: Long): List<RefuelEntry> =
+                previewRefuels.takeIf { carId == previewCar.id } ?: emptyList()
 
             override suspend fun addCar(input: com.lszczepanski.fuelconsumptionlog.domain.model.CarInput): Result<Unit> {
                 return Result.success(Unit)
@@ -454,10 +361,16 @@ private fun CarDetailsScreenPreview() {
         }
     }
 
-    MaterialTheme {
-        CarDetailsScreen(
+    val previewViewModel = remember {
+        CarDetailsViewModel(
             carId = 1,
             repository = previewRepository,
+        )
+    }
+
+    MaterialTheme {
+        CarDetailsScreen(
+            viewModel = previewViewModel,
             onBack = {},
         )
     }

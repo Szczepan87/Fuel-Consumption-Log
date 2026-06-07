@@ -4,12 +4,11 @@ import com.lszczepanski.fuelconsumptionlog.domain.model.Car
 import com.lszczepanski.fuelconsumptionlog.domain.model.CarInput
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelEntry
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelInput
-import kotlinx.coroutines.flow.Flow
 
 interface CarRepository {
-    fun observeCars(): Flow<List<Car>>
-    fun observeCarById(carId: Long): Flow<Car?>
-    fun observeRefuelsByCarId(carId: Long): Flow<List<RefuelEntry>>
+    suspend fun getCars(): List<Car>
+    suspend fun getCarById(carId: Long): Car?
+    suspend fun getRefuelsByCarId(carId: Long): List<RefuelEntry>
 
     suspend fun addCar(input: CarInput): Result<Unit>
     suspend fun addRefuel(carId: Long, input: RefuelInput): Result<Unit>

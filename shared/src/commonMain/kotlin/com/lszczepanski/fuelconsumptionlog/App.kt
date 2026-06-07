@@ -7,28 +7,36 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
-import com.lszczepanski.fuelconsumptionlog.data.local.SqlDelightCarRepository
-import com.lszczepanski.fuelconsumptionlog.data.local.rememberDatabaseDriverFactory
+import com.lszczepanski.fuelconsumptionlog.di.initKoin
 import com.lszczepanski.fuelconsumptionlog.presentation.cars.CarDetailsScreen
+import com.lszczepanski.fuelconsumptionlog.presentation.cars.CarDetailsViewModel
 import com.lszczepanski.fuelconsumptionlog.presentation.cars.CarsScreen
+import com.lszczepanski.fuelconsumptionlog.presentation.cars.CarsViewModel
+import org.koin.core.parameter.parametersOf
+import org.koin.mp.KoinPlatform
 
 @Composable
 @Preview
 fun App() {
-    val databaseDriverFactory = rememberDatabaseDriverFactory()
-    val repository = remember(databaseDriverFactory) { SqlDelightCarRepository(databaseDriverFactory) }
+    initKoin()
+
+    val koin = remember { KoinPlatform.getKoin() }
+    val carsViewModel = remember { koin.get<CarsViewModel>() }
     var selectedCarId by remember { mutableStateOf<Long?>(null) }
 
     MaterialTheme {
         if (selectedCarId == null) {
             CarsScreen(
-                repository = repository,
+                viewModel = carsViewModel,
                 onCarSelected = { selectedCarId = it },
             )
         } else {
+            val detailsViewModel = remember(selectedCarId) {
+                koin.get<CarDetailsViewModel> { parametersOf(selectedCarId!!) }
+            }
+
             CarDetailsScreen(
-                carId = selectedCarId!!,
-                repository = repository,
+                viewModel = detailsViewModel,
                 onBack = { selectedCarId = null },
             )
         }
