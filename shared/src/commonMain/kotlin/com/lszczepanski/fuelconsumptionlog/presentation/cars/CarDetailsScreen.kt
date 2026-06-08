@@ -46,6 +46,11 @@ fun CarDetailsScreen(
     onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val latestRefuelId = remember(uiState.refuels) {
+        uiState.refuels
+            .maxWithOrNull(compareBy<RefuelEntry> { it.createdAtEpochMillis }.thenBy { it.id })
+            ?.id
+    }
     val refuelConsumptions = remember(uiState.refuels, uiState.initialMileageKm) {
         calculateRefuelConsumptions(
             refuels = uiState.refuels,
@@ -115,9 +120,11 @@ fun CarDetailsScreen(
                     }
                 } else {
                     items(uiState.refuels, key = { it.id }) { refuel ->
+                        val isEditable = refuel.id == latestRefuelId || refuel.isDraft
                         RefuelRow(
                             refuel = refuel,
                             consumptionPer100Km = refuelConsumptions[refuel.id],
+                            isEditable = isEditable,
                             onClick = { viewModel.onEditRefuelClick(refuel) },
                         )
                     }
@@ -132,6 +139,7 @@ fun CarDetailsScreen(
         RefuelDialog(
             draft = uiState.draft,
             isEditing = uiState.isEditing,
+            isOdometerEditable = !uiState.isEditing || uiState.editingRefuelIsDraft,
             errorMessage = uiState.errorMessage,
             isSaving = uiState.isSaving,
             onDraftChanged = viewModel::onDraftChanged,
@@ -167,6 +175,7 @@ private fun CarHeaderCard(
 private fun RefuelRow(
     refuel: RefuelEntry,
     consumptionPer100Km: Double?,
+    isEditable: Boolean,
     onClick: () -> Unit,
 ) {
     val status = if (refuel.isDraft) "Draft" else "Zapisane"
@@ -176,7 +185,7 @@ private fun RefuelRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = isEditable, onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -190,6 +199,9 @@ private fun RefuelRow(
                 Text("Paliwo: $liters")
                 Text("Licznik: ${refuel.odometerKm} km")
                 Text("Status: $status")
+                if (isEditable) {
+                    Text("Mozesz edytowac litry i przebieg", style = MaterialTheme.typography.bodySmall)
+                }
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -229,6 +241,7 @@ private fun calculateRefuelConsumptions(
 private fun RefuelDialog(
     draft: RefuelDraft,
     isEditing: Boolean,
+    isOdometerEditable: Boolean,
     errorMessage: String?,
     isSaving: Boolean,
     onDraftChanged: (RefuelDraft) -> Unit,
@@ -252,7 +265,7 @@ private fun RefuelDialog(
                     value = draft.odometerKm,
                     onValueChange = { onDraftChanged(draft.copy(odometerKm = it)) },
                     label = { Text("Stan licznika (km)") },
-                    enabled = !isEditing,
+                    enabled = isOdometerEditable,
                     singleLine = true,
                 )
                 Text(
@@ -261,7 +274,7 @@ private fun RefuelDialog(
                 )
                 if (isEditing) {
                     Text(
-                        "Podczas edycji nie mozna zmienic stanu licznika.",
+                        "Edycja litrow i przebiegu jest dostepna tylko dla najnowszego wpisu typu draft.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -324,6 +337,7 @@ private fun RefuelRowPreview() {
                 isDraft = false,
             ),
             consumptionPer100Km = 6.3,
+            isEditable = true,
             onClick = {},
         )
     }
@@ -339,6 +353,7 @@ private fun RefuelDialogPreview() {
                 odometerKm = "182450",
             ),
             isEditing = false,
+            isOdometerEditable = true,
             errorMessage = null,
             isSaving = false,
             onDraftChanged = {},
