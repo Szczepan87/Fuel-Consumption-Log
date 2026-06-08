@@ -48,6 +48,7 @@ class SqlDelightCarRepository(
                     engine_capacity_cm3 = input.engineCapacityCm3.toLong(),
                     horse_power = input.horsePower.toLong(),
                     registration_number = input.registrationNumber,
+                    initial_mileage_km = input.mileageKm.toLong(),
                     mileage_km = input.mileageKm.toLong(),
                 )
             }
@@ -99,6 +100,7 @@ class SqlDelightCarRepository(
             engineCapacityCm3 = row.engine_capacity_cm3.toInt(),
             horsePower = row.horse_power.toInt(),
             registrationNumber = row.registration_number,
+            initialMileageKm = row.initial_mileage_km.toInt(),
             mileageKm = row.mileage_km.toInt(),
         )
     }

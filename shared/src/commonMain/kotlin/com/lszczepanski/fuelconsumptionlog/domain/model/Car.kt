@@ -7,6 +7,7 @@ data class Car(
     val engineCapacityCm3: Int,
     val horsePower: Int,
     val registrationNumber: String,
+    val initialMileageKm: Int,
     val mileageKm: Int,
 )
 

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 
 data class CarDetailsUiState(
     val car: Car? = null,
+    val initialMileageKm: Int? = null,
     val refuels: List<RefuelEntry> = emptyList(),
     val averageConsumption: Double? = null,
     val isDialogOpen: Boolean = false,
@@ -109,10 +110,15 @@ class CarDetailsViewModel(
                             val car = repository.getCarById(carId)
                             val refuels = repository.getRefuelsByCarId(carId)
                             _uiState.update {
+                                val initialMileageKm = it.initialMileageKm ?: car?.initialMileageKm
                                 it.copy(
                                     car = car,
+                                    initialMileageKm = initialMileageKm,
                                     refuels = refuels,
-                                    averageConsumption = calculateAverageConsumption(refuels),
+                                    averageConsumption = calculateAverageConsumption(
+                                        refuels = refuels,
+                                        initialMileageKm = initialMileageKm,
+                                    ),
                                     isDialogOpen = false,
                                     isEditing = false,
                                     editingRefuelId = null,
@@ -147,28 +153,34 @@ class CarDetailsViewModel(
         val car = repository.getCarById(carId)
         val refuels = repository.getRefuelsByCarId(carId)
         _uiState.update {
+            val initialMileageKm = it.initialMileageKm ?: car?.initialMileageKm
             it.copy(
                 car = car,
+                initialMileageKm = initialMileageKm,
                 refuels = refuels,
-                averageConsumption = calculateAverageConsumption(refuels),
+                averageConsumption = calculateAverageConsumption(
+                    refuels = refuels,
+                    initialMileageKm = initialMileageKm,
+                ),
             )
         }
     }
 
-    private fun calculateAverageConsumption(refuels: List<RefuelEntry>): Double? {
+    private fun calculateAverageConsumption(
+        refuels: List<RefuelEntry>,
+        initialMileageKm: Int?,
+    ): Double? {
         val completed = refuels
             .filter { !it.isDraft && it.fuelLiters != null }
             .sortedBy { it.odometerKm }
 
-        if (completed.size < 2) return null
+        if (completed.isEmpty()) return null
 
-        val distanceKm = completed.last().odometerKm - completed.first().odometerKm
+        val baseMileage = initialMileageKm ?: 0
+        val distanceKm = completed.last().odometerKm - baseMileage
         if (distanceKm <= 0) return null
 
-        var totalLiters = 0.0
-        for (index in 1 until completed.size) {
-            totalLiters += completed[index].fuelLiters ?: 0.0
-        }
+        val totalLiters = completed.sumOf { it.fuelLiters ?: 0.0 }
 
         return (totalLiters * 100.0) / distanceKm.toDouble()
     }

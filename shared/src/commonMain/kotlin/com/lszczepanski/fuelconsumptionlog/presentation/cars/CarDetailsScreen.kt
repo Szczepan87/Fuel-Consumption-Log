@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,6 +46,12 @@ fun CarDetailsScreen(
     onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val refuelConsumptions = remember(uiState.refuels, uiState.initialMileageKm) {
+        calculateRefuelConsumptions(
+            refuels = uiState.refuels,
+            initialMileageKm = uiState.initialMileageKm,
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -110,6 +117,7 @@ fun CarDetailsScreen(
                     items(uiState.refuels, key = { it.id }) { refuel ->
                         RefuelRow(
                             refuel = refuel,
+                            consumptionPer100Km = refuelConsumptions[refuel.id],
                             onClick = { viewModel.onEditRefuelClick(refuel) },
                         )
                     }
@@ -158,23 +166,63 @@ private fun CarHeaderCard(
 @Composable
 private fun RefuelRow(
     refuel: RefuelEntry,
+    consumptionPer100Km: Double?,
     onClick: () -> Unit,
 ) {
     val status = if (refuel.isDraft) "Draft" else "Zapisane"
     val liters = refuel.fuelLiters?.let { "$it l" } ?: "-"
+    val consumptionText = consumptionPer100Km?.let { "${round(it * 10.0) / 10.0} l/100 km" } ?: "-"
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(formatEpochMillis(refuel.createdAtEpochMillis), fontWeight = FontWeight.SemiBold)
-            Text("Paliwo: $liters")
-            Text("Licznik: ${refuel.odometerKm} km")
-            Text("Status: $status")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                Text(formatEpochMillis(refuel.createdAtEpochMillis), fontWeight = FontWeight.SemiBold)
+                Text("Paliwo: $liters")
+                Text("Licznik: ${refuel.odometerKm} km")
+                Text("Status: $status")
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Spalanie", fontWeight = FontWeight.SemiBold)
+                Text(consumptionText)
+            }
         }
     }
+}
+
+private fun calculateRefuelConsumptions(
+    refuels: List<RefuelEntry>,
+    initialMileageKm: Int?,
+): Map<Long, Double> {
+    val completed = refuels
+        .filter { !it.isDraft && it.fuelLiters != null }
+        .sortedBy { it.odometerKm }
+
+    if (completed.isEmpty()) return emptyMap()
+
+    val result = mutableMapOf<Long, Double>()
+    var previousOdometer = initialMileageKm ?: 0
+
+    for (refuel in completed) {
+        val distanceKm = refuel.odometerKm - previousOdometer
+        val liters = refuel.fuelLiters ?: continue
+        if (distanceKm > 0) {
+            result[refuel.id] = (liters * 100.0) / distanceKm.toDouble()
+        }
+        previousOdometer = refuel.odometerKm
+    }
+
+    return result
 }
 
 @Composable
@@ -275,6 +323,7 @@ private fun RefuelRowPreview() {
                 odometerKm = 182300,
                 isDraft = false,
             ),
+            consumptionPer100Km = 6.3,
             onClick = {},
         )
     }
@@ -309,6 +358,7 @@ private fun CarDetailsScreenPreview() {
         engineCapacityCm3 = 1968,
         horsePower = 150,
         registrationNumber = "KR 1234A",
+        initialMileageKm = 180000,
         mileageKm = 182300,
     )
     val previewRefuels = listOf(

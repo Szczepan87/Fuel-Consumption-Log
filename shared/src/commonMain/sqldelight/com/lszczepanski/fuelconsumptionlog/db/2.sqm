@@ -1,0 +1,6 @@
+ALTER TABLE cars ADD COLUMN initial_mileage_km INTEGER NOT NULL DEFAULT 0;
+
+UPDATE cars
+SET initial_mileage_km = mileage_km
+WHERE initial_mileage_km = 0;
+
