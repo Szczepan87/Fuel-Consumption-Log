@@ -63,24 +63,23 @@ class SqlDelightCarRepository(
                     created_at_epoch_millis = currentTimeMillis(),
                     fuel_liters = input.fuelLiters,
                     odometer_km = input.odometerKm.toLong(),
-                    is_draft = if (input.isDraft) 1L else 0L,
                 )
 
-                if (!input.isDraft) {
-                    updateCarMileageIfNeeded(carId = carId, odometerKm = input.odometerKm)
-                }
+                updateCarMileageIfNeeded(carId = carId, odometerKm = input.odometerKm)
             }
         }
     }
 
-    override suspend fun updateRefuel(refuelId: Long, input: RefuelInput): Result<Unit> {
+    override suspend fun updateRefuel(carId: Long, refuelId: Long, input: RefuelInput): Result<Unit> {
         return runCatching {
             withContext(Dispatchers.Default) {
                 queries.updateRefuel(
                     fuel_liters = input.fuelLiters,
-                    is_draft = if (input.isDraft) 1L else 0L,
+                    odometer_km = input.odometerKm.toLong(),
                     id = refuelId,
                 )
+
+                updateCarMileageIfNeeded(carId = carId, odometerKm = input.odometerKm)
             }
         }
     }
@@ -112,7 +111,6 @@ class SqlDelightCarRepository(
             createdAtEpochMillis = row.created_at_epoch_millis,
             fuelLiters = row.fuel_liters,
             odometerKm = row.odometer_km.toInt(),
-            isDraft = row.is_draft != 0L,
         )
     }
 }

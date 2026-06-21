@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,9 @@ fun CarDetailsScreen(
         uiState.refuels
             .maxWithOrNull(compareBy<RefuelEntry> { it.createdAtEpochMillis }.thenBy { it.id })
             ?.id
+    }
+    val canAddRefuel = remember(uiState.refuels) {
+        uiState.refuels.isEmpty() || uiState.refuels.firstOrNull { it.id == latestRefuelId }?.fuelLiters != null
     }
     val refuelConsumptions = remember(uiState.refuels, uiState.initialMileageKm) {
         calculateRefuelConsumptions(
@@ -78,7 +82,12 @@ fun CarDetailsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = viewModel::onAddRefuelClick
+                onClick = {
+                    if (canAddRefuel) {
+                        viewModel.onAddRefuelClick()
+                    }
+                },
+                modifier = Modifier.alpha(if (canAddRefuel) 1f else 0.5f),
             ) {
                 Text("+")
             }
@@ -113,6 +122,15 @@ fun CarDetailsScreen(
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                     )
                 }
+                if (!canAddRefuel) {
+                    item {
+                        Text(
+                            "Uzupelnij litry w najnowszym tankowaniu, aby dodac kolejne.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
 
                 if (uiState.refuels.isEmpty()) {
                     item {
@@ -120,7 +138,7 @@ fun CarDetailsScreen(
                     }
                 } else {
                     items(uiState.refuels, key = { it.id }) { refuel ->
-                        val isEditable = refuel.id == latestRefuelId || refuel.isDraft
+                        val isEditable = refuel.id == latestRefuelId
                         RefuelRow(
                             refuel = refuel,
                             consumptionPer100Km = refuelConsumptions[refuel.id],
@@ -139,7 +157,6 @@ fun CarDetailsScreen(
         RefuelDialog(
             draft = uiState.draft,
             isEditing = uiState.isEditing,
-            isOdometerEditable = !uiState.isEditing || uiState.editingRefuelIsDraft,
             errorMessage = uiState.errorMessage,
             isSaving = uiState.isSaving,
             onDraftChanged = viewModel::onDraftChanged,
@@ -178,8 +195,7 @@ private fun RefuelRow(
     isEditable: Boolean,
     onClick: () -> Unit,
 ) {
-    val status = if (refuel.isDraft) "Draft" else "Zapisane"
-    val liters = refuel.fuelLiters?.let { "$it l" } ?: "-"
+    val liters = refuel.fuelLiters?.let { "$it l" } ?: "do uzupelnienia"
     val consumptionText = consumptionPer100Km?.let { "${round(it * 10.0) / 10.0} l/100 km" } ?: "-"
 
     Card(
@@ -198,7 +214,6 @@ private fun RefuelRow(
                 Text(formatEpochMillis(refuel.createdAtEpochMillis), fontWeight = FontWeight.SemiBold)
                 Text("Paliwo: $liters")
                 Text("Licznik: ${refuel.odometerKm} km")
-                Text("Status: $status")
                 if (isEditable) {
                     Text("Mozesz edytowac litry i przebieg", style = MaterialTheme.typography.bodySmall)
                 }
@@ -217,7 +232,7 @@ private fun calculateRefuelConsumptions(
     initialMileageKm: Int?,
 ): Map<Long, Double> {
     val completed = refuels
-        .filter { !it.isDraft && it.fuelLiters != null }
+        .filter { it.fuelLiters != null }
         .sortedBy { it.odometerKm }
 
     if (completed.isEmpty()) return emptyMap()
@@ -241,12 +256,11 @@ private fun calculateRefuelConsumptions(
 private fun RefuelDialog(
     draft: RefuelDraft,
     isEditing: Boolean,
-    isOdometerEditable: Boolean,
     errorMessage: String?,
     isSaving: Boolean,
     onDraftChanged: (RefuelDraft) -> Unit,
     onDismiss: () -> Unit,
-    onSave: (Boolean) -> Unit,
+    onSave: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -265,7 +279,6 @@ private fun RefuelDialog(
                     value = draft.odometerKm,
                     onValueChange = { onDraftChanged(draft.copy(odometerKm = it)) },
                     label = { Text("Stan licznika (km)") },
-                    enabled = isOdometerEditable,
                     singleLine = true,
                 )
                 Text(
@@ -274,7 +287,7 @@ private fun RefuelDialog(
                 )
                 if (isEditing) {
                     Text(
-                        "Edycja litrow i przebiegu jest dostepna tylko dla najnowszego wpisu typu draft.",
+                        "Edycja litrow i przebiegu jest dostepna tylko dla najnowszego wpisu.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -288,14 +301,8 @@ private fun RefuelDialog(
             }
         },
         confirmButton = {
-            Row(horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { onSave(true) }, enabled = !isSaving) {
-                    Text("Zapisz draft")
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                TextButton(onClick = { onSave(false) }, enabled = !isSaving) {
-                    Text("Zapisz")
-                }
+            TextButton(onClick = onSave, enabled = !isSaving) {
+                Text("Zapisz")
             }
         },
         dismissButton = {
@@ -334,7 +341,6 @@ private fun RefuelRowPreview() {
                 createdAtEpochMillis = 1_780_000_000_000,
                 fuelLiters = 42.7,
                 odometerKm = 182300,
-                isDraft = false,
             ),
             consumptionPer100Km = 6.3,
             isEditable = true,
@@ -353,7 +359,6 @@ private fun RefuelDialogPreview() {
                 odometerKm = "182450",
             ),
             isEditing = false,
-            isOdometerEditable = true,
             errorMessage = null,
             isSaving = false,
             onDraftChanged = {},
@@ -383,7 +388,6 @@ private fun CarDetailsScreenPreview() {
             createdAtEpochMillis = 1_780_010_000_000,
             fuelLiters = 40.1,
             odometerKm = 182300,
-            isDraft = false,
         ),
         RefuelEntry(
             id = 2,
@@ -391,7 +395,6 @@ private fun CarDetailsScreenPreview() {
             createdAtEpochMillis = 1_779_800_000_000,
             fuelLiters = null,
             odometerKm = 181900,
-            isDraft = true,
         ),
         RefuelEntry(
             id = 1,
@@ -399,7 +402,6 @@ private fun CarDetailsScreenPreview() {
             createdAtEpochMillis = 1_779_500_000_000,
             fuelLiters = 41.6,
             odometerKm = 181500,
-            isDraft = false,
         ),
     )
 
@@ -420,7 +422,7 @@ private fun CarDetailsScreenPreview() {
                 return Result.success(Unit)
             }
 
-            override suspend fun updateRefuel(refuelId: Long, input: RefuelInput): Result<Unit> {
+            override suspend fun updateRefuel(carId: Long, refuelId: Long, input: RefuelInput): Result<Unit> {
                 return Result.success(Unit)
             }
         }

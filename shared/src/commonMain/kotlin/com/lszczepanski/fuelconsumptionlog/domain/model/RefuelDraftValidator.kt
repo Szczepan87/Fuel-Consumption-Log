@@ -1,7 +1,7 @@
 package com.lszczepanski.fuelconsumptionlog.domain.model
 
 object RefuelDraftValidator {
-    fun validate(draft: RefuelDraft, saveAsDraft: Boolean): Result<RefuelInput> {
+    fun validate(draft: RefuelDraft): Result<RefuelInput> {
         val odometer = draft.odometerKm.trim().toIntOrNull()
             ?: return Result.failure(IllegalArgumentException("Stan licznika jest wymagany i musi byc liczba calkowita."))
         if (odometer < 0) {
@@ -16,20 +16,7 @@ object RefuelDraftValidator {
                 ?: return Result.failure(IllegalArgumentException("Ilosc paliwa musi byc liczba."))
         }
 
-        if (saveAsDraft) {
-            return Result.success(
-                RefuelInput(
-                    fuelLiters = liters,
-                    odometerKm = odometer,
-                    isDraft = true,
-                )
-            )
-        }
-
-        if (liters == null) {
-            return Result.failure(IllegalArgumentException("Ilosc paliwa jest wymagana przy zapisie finalnym."))
-        }
-        if (liters <= 0.0) {
+        if (liters != null && liters <= 0.0) {
             return Result.failure(IllegalArgumentException("Ilosc paliwa musi byc wieksza od zera."))
         }
 
@@ -37,7 +24,6 @@ object RefuelDraftValidator {
             RefuelInput(
                 fuelLiters = liters,
                 odometerKm = odometer,
-                isDraft = false,
             )
         )
     }

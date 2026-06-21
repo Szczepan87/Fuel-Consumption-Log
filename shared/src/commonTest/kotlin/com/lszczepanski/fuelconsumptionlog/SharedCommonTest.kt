@@ -46,26 +46,26 @@ class SharedCommonTest {
     }
 
     @Test
-    fun allowsDraftWithoutFuelLiters() {
+    fun allowsRefuelWithoutFuelLiters() {
         val draft = RefuelDraft(
             fuelLiters = "",
             odometerKm = "221000",
         )
 
-        val result = RefuelDraftValidator.validate(draft, saveAsDraft = true)
+        val result = RefuelDraftValidator.validate(draft)
 
         assertTrue(result.isSuccess)
-        assertTrue(result.getOrThrow().isDraft)
+        assertEquals(null, result.getOrThrow().fuelLiters)
     }
 
     @Test
-    fun requiresFuelLitersForFinalSave() {
+    fun rejectsNonPositiveFuelLiters() {
         val draft = RefuelDraft(
-            fuelLiters = "",
+            fuelLiters = "0",
             odometerKm = "221000",
         )
 
-        val result = RefuelDraftValidator.validate(draft, saveAsDraft = false)
+        val result = RefuelDraftValidator.validate(draft)
 
         assertTrue(result.isFailure)
     }

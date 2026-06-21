@@ -21,8 +21,6 @@ data class CarDetailsUiState(
     val isDialogOpen: Boolean = false,
     val isEditing: Boolean = false,
     val editingRefuelId: Long? = null,
-    val editingRefuelIsDraft: Boolean = false,
-    val editingOdometerKm: Int? = null,
     val draft: RefuelDraft = RefuelDraft(),
     val errorMessage: String? = null,
     val isSaving: Boolean = false,
@@ -43,13 +41,15 @@ class CarDetailsViewModel(
     }
 
     fun onAddRefuelClick() {
+        if (!canAddNewRefuel(_uiState.value.refuels)) {
+            return
+        }
+
         _uiState.update {
             it.copy(
                 isDialogOpen = true,
                 isEditing = false,
                 editingRefuelId = null,
-                editingRefuelIsDraft = false,
-                editingOdometerKm = null,
                 draft = RefuelDraft(),
                 errorMessage = null,
                 isSaving = false,
@@ -58,11 +58,9 @@ class CarDetailsViewModel(
     }
 
     fun onEditRefuelClick(refuel: RefuelEntry) {
-        val latestRefuelId = _uiState.value.refuels
-            .maxWithOrNull(compareBy<RefuelEntry> { it.createdAtEpochMillis }.thenBy { it.id })
-            ?.id
+        val latestRefuelId = latestRefuel(_uiState.value.refuels)?.id
 
-        if (latestRefuelId == null || refuel.id != latestRefuelId || !refuel.isDraft) {
+        if (latestRefuelId == null || latestRefuelId != refuel.id) {
             return
         }
 
@@ -71,8 +69,6 @@ class CarDetailsViewModel(
                 isDialogOpen = true,
                 isEditing = true,
                 editingRefuelId = refuel.id,
-                editingRefuelIsDraft = refuel.isDraft,
-                editingOdometerKm = refuel.odometerKm,
                 draft = RefuelDraft(
                     fuelLiters = refuel.fuelLiters?.toString() ?: "",
                     odometerKm = refuel.odometerKm.toString(),
@@ -89,8 +85,7 @@ class CarDetailsViewModel(
                 isDialogOpen = false,
                 isEditing = false,
                 editingRefuelId = null,
-                editingRefuelIsDraft = false,
-                editingOdometerKm = null,
+                draft = RefuelDraft(),
                 errorMessage = null,
                 isSaving = false,
             )
@@ -101,45 +96,35 @@ class CarDetailsViewModel(
         _uiState.update { it.copy(draft = draft, errorMessage = null) }
     }
 
-    fun onSaveRefuel(saveAsDraft: Boolean) {
+    fun onSaveRefuel() {
         val state = _uiState.value
         if (state.isSaving) return
 
         if (state.isEditing) {
-            val latestRefuel = state.refuels
-                .maxWithOrNull(compareBy<RefuelEntry> { it.createdAtEpochMillis }.thenBy { it.id })
-            val canEditCurrent = latestRefuel != null &&
-                latestRefuel.id == state.editingRefuelId &&
-                latestRefuel.isDraft
+            val latestRefuel = latestRefuel(state.refuels)
+            val canEditCurrent = latestRefuel != null && latestRefuel.id == state.editingRefuelId
 
             if (!canEditCurrent) {
                 _uiState.update {
                     it.copy(
-                        errorMessage = "Edytowac mozna tylko najnowsze tankowanie typu draft.",
+                        errorMessage = "Edytowac mozna tylko najnowsze tankowanie.",
                         isSaving = false,
                     )
                 }
                 return
             }
+        } else if (!canAddNewRefuel(state.refuels)) {
+            return
         }
 
-        val draftToValidate = if (state.isEditing && !state.editingRefuelIsDraft && state.editingOdometerKm != null) {
-            state.draft.copy(odometerKm = state.editingOdometerKm.toString())
-        } else {
-            state.draft
-        }
-
-        val validation = RefuelDraftValidator.validate(
-            draft = draftToValidate,
-            saveAsDraft = saveAsDraft,
-        )
+        val validation = RefuelDraftValidator.validate(state.draft)
 
         validation
             .onSuccess { input ->
                 _uiState.update { it.copy(isSaving = true, errorMessage = null) }
                 viewModelScope.launch {
                     val saveResult = if (state.isEditing) {
-                        repository.updateRefuel(refuelId = state.editingRefuelId!!, input = input)
+                        repository.updateRefuel(carId = carId, refuelId = state.editingRefuelId!!, input = input)
                     } else {
                         repository.addRefuel(carId = carId, input = input)
                     }
@@ -161,8 +146,6 @@ class CarDetailsViewModel(
                                     isDialogOpen = false,
                                     isEditing = false,
                                     editingRefuelId = null,
-                                    editingRefuelIsDraft = false,
-                                    editingOdometerKm = null,
                                     draft = RefuelDraft(),
                                     errorMessage = null,
                                     isSaving = false,
@@ -211,7 +194,7 @@ class CarDetailsViewModel(
         initialMileageKm: Int?,
     ): Double? {
         val completed = refuels
-            .filter { !it.isDraft && it.fuelLiters != null }
+            .filter { it.fuelLiters != null }
             .sortedBy { it.odometerKm }
 
         if (completed.isEmpty()) return null
@@ -223,6 +206,14 @@ class CarDetailsViewModel(
         val totalLiters = completed.sumOf { it.fuelLiters ?: 0.0 }
 
         return (totalLiters * 100.0) / distanceKm.toDouble()
+    }
+
+    private fun latestRefuel(refuels: List<RefuelEntry>): RefuelEntry? {
+        return refuels.maxWithOrNull(compareBy<RefuelEntry> { it.createdAtEpochMillis }.thenBy { it.id })
+    }
+
+    private fun canAddNewRefuel(refuels: List<RefuelEntry>): Boolean {
+        return latestRefuel(refuels)?.fuelLiters != null || refuels.isEmpty()
     }
 }
 

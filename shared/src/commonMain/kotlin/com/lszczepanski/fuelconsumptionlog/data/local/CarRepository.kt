@@ -12,6 +12,6 @@ interface CarRepository {
 
     suspend fun addCar(input: CarInput): Result<Unit>
     suspend fun addRefuel(carId: Long, input: RefuelInput): Result<Unit>
-    suspend fun updateRefuel(refuelId: Long, input: RefuelInput): Result<Unit>
+    suspend fun updateRefuel(carId: Long, refuelId: Long, input: RefuelInput): Result<Unit>
 }
 

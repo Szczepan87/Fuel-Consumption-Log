@@ -6,7 +6,6 @@ data class RefuelEntry(
     val createdAtEpochMillis: Long,
     val fuelLiters: Double?,
     val odometerKm: Int,
-    val isDraft: Boolean,
 )
 
 data class RefuelDraft(
@@ -17,6 +16,5 @@ data class RefuelDraft(
 data class RefuelInput(
     val fuelLiters: Double?,
     val odometerKm: Int,
-    val isDraft: Boolean,
 )
 
