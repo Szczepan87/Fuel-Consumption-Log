@@ -5,10 +5,10 @@ import com.lszczepanski.fuelconsumptionlog.data.local.SqlDelightCarRepository
 import com.lszczepanski.fuelconsumptionlog.presentation.cars.CarDetailsViewModel
 import com.lszczepanski.fuelconsumptionlog.presentation.cars.CarsViewModel
 import org.koin.core.KoinApplication
-import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.module
+import org.koin.mp.KoinPlatformTools
 
 private val commonModule = module {
     single<CarRepository> { SqlDelightCarRepository(get()) }
@@ -19,7 +19,7 @@ private val commonModule = module {
 expect val platformModule: Module
 
 fun initKoin(config: (KoinApplication.() -> Unit)? = null) {
-    if (GlobalContext.getOrNull() != null) return
+    if (KoinPlatformTools.defaultContext().getOrNull() != null) return
 
     startKoin {
         config?.invoke(this)

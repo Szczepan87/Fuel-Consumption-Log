@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
@@ -9,6 +11,10 @@ plugins {
 }
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -73,6 +79,10 @@ sqldelight {
             packageName.set("com.lszczepanski.fuelconsumptionlog.db")
         }
     }
+}
+
+tasks.matching { it.name == "verifyCommonMainFuelLogDatabaseMigration" }.configureEach {
+    enabled = !isWindows
 }
 
 dependencies {
