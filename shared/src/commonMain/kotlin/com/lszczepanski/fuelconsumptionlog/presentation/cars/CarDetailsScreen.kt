@@ -39,6 +39,7 @@ import com.lszczepanski.fuelconsumptionlog.domain.model.Car
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelDraft
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelEntry
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelInput
+import com.lszczepanski.fuelconsumptionlog.domain.model.UnitSystem
 import com.lszczepanski.fuelconsumptionlog.util.formatEpochMillis
 import com.lszczepanski.fuelconsumptionlog.util.formatDecimal
 import kotlin.math.round
@@ -48,6 +49,7 @@ import kotlin.math.round
 fun CarDetailsScreen(
     viewModel: CarDetailsViewModel,
     onBack: () -> Unit,
+    unitSystem: UnitSystem,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val latestRefuelId = remember(uiState.refuels) {
@@ -115,6 +117,7 @@ fun CarDetailsScreen(
                         horsePower = uiState.car!!.horsePower,
                         mileageKm = uiState.car!!.mileageKm,
                         averageConsumption = uiState.averageConsumption,
+                        unitSystem = unitSystem,
                     )
                 }
                 item {
@@ -146,6 +149,7 @@ fun CarDetailsScreen(
                             refuel = refuel,
                             consumptionPer100Km = refuelConsumptions[refuel.id],
                             isEditable = isEditable,
+                            unitSystem = unitSystem,
                             onClick = { viewModel.onEditRefuelClick(refuel) },
                         )
                     }
@@ -178,14 +182,15 @@ private fun CarHeaderCard(
     horsePower: Int,
     mileageKm: Double,
     averageConsumption: Double?,
+    unitSystem: UnitSystem,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("$brand $model", style = MaterialTheme.typography.titleLarge)
             Text("Rejestracja: $registration")
             Text("Silnik: ${engineCapacity} cm3, ${horsePower} KM")
-            Text("Aktualny przebieg: ${formatDecimal(mileageKm)} km")
-            val avgText = averageConsumption?.let { "${round(it * 10.0) / 10.0} l/100 km" } ?: "Brak danych"
+            Text("Aktualny przebieg: ${formatDistance(mileageKm, unitSystem)}")
+            val avgText = averageConsumption?.let { formatConsumption(it, unitSystem) } ?: "Brak danych"
             Text("Srednie spalanie: $avgText", fontWeight = FontWeight.SemiBold)
         }
     }
@@ -196,10 +201,11 @@ private fun RefuelRow(
     refuel: RefuelEntry,
     consumptionPer100Km: Double?,
     isEditable: Boolean,
+    unitSystem: UnitSystem,
     onClick: () -> Unit,
 ) {
     val liters = refuel.fuelLiters?.let { "${formatDecimal(it)} l" } ?: "do uzupelnienia"
-    val consumptionText = consumptionPer100Km?.let { "${round(it * 10.0) / 10.0} l/100 km" } ?: "-"
+    val consumptionText = consumptionPer100Km?.let { formatConsumption(it, unitSystem) } ?: "-"
 
     Card(
         modifier = Modifier
@@ -216,7 +222,7 @@ private fun RefuelRow(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
                 Text(formatEpochMillis(refuel.createdAtEpochMillis), fontWeight = FontWeight.SemiBold)
                 Text("Paliwo: $liters")
-                Text("Licznik: ${formatDecimal(refuel.odometerKm)} km")
+                Text("Licznik: ${formatDistance(refuel.odometerKm, unitSystem)}")
                 if (isEditable) {
                     Text("Mozesz edytowac litry i przebieg", style = MaterialTheme.typography.bodySmall)
                 }
@@ -227,6 +233,24 @@ private fun RefuelRow(
                 Text(consumptionText)
             }
         }
+    }
+}
+
+private const val KM_TO_MILES = 0.621371
+private const val L_PER_100_KM_TO_MPG = 235.214583
+
+private fun formatDistance(distanceKm: Double, unitSystem: UnitSystem): String {
+    return when (unitSystem) {
+        UnitSystem.METRIC -> "${formatDecimal(distanceKm)} km"
+        UnitSystem.IMPERIAL -> "${formatDecimal(distanceKm * KM_TO_MILES)} mi"
+    }
+}
+
+private fun formatConsumption(consumptionPer100Km: Double, unitSystem: UnitSystem): String {
+    if (consumptionPer100Km <= 0.0) return "-"
+    return when (unitSystem) {
+        UnitSystem.METRIC -> "${round(consumptionPer100Km * 10.0) / 10.0} l/100 km"
+        UnitSystem.IMPERIAL -> "${round((L_PER_100_KM_TO_MPG / consumptionPer100Km) * 10.0) / 10.0} mpg"
     }
 }
 
@@ -331,6 +355,7 @@ private fun CarHeaderCardPreview() {
             horsePower = 150,
             mileageKm = 182300.0,
             averageConsumption = 6.1,
+            unitSystem = UnitSystem.METRIC,
         )
     }
 }
@@ -349,6 +374,7 @@ private fun RefuelRowPreview() {
             ),
             consumptionPer100Km = 6.3,
             isEditable = true,
+            unitSystem = UnitSystem.METRIC,
             onClick = {},
         )
     }
@@ -444,6 +470,7 @@ private fun CarDetailsScreenPreview() {
         CarDetailsScreen(
             viewModel = previewViewModel,
             onBack = {},
+            unitSystem = UnitSystem.METRIC,
         )
     }
 }
