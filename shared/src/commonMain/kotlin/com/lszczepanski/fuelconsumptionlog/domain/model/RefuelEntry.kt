@@ -5,7 +5,7 @@ data class RefuelEntry(
     val carId: Long,
     val createdAtEpochMillis: Long,
     val fuelLiters: Double?,
-    val odometerKm: Int,
+    val odometerKm: Double,
 )
 
 data class RefuelDraft(
@@ -15,6 +15,5 @@ data class RefuelDraft(
 
 data class RefuelInput(
     val fuelLiters: Double?,
-    val odometerKm: Int,
+    val odometerKm: Double,
 )
-

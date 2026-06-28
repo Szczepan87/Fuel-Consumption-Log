@@ -15,6 +15,5 @@ data class CarInput(
     val engineCapacityCm3: Int,
     val horsePower: Int,
     val registrationNumber: String,
-    val mileageKm: Int,
+    val mileageKm: Double,
 )
-

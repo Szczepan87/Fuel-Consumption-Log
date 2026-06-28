@@ -1,9 +1,15 @@
 package com.lszczepanski.fuelconsumptionlog.domain.model
 
 object RefuelDraftValidator {
+    private val decimalPattern = Regex("^\\d+(?:[.,]\\d+)?$")
+
     fun validate(draft: RefuelDraft): Result<RefuelInput> {
-        val odometer = draft.odometerKm.trim().toIntOrNull()
-            ?: return Result.failure(IllegalArgumentException("Stan licznika jest wymagany i musi byc liczba calkowita."))
+        val odometerRaw = draft.odometerKm.trim()
+        if (!decimalPattern.matches(odometerRaw)) {
+            return Result.failure(IllegalArgumentException("Stan licznika jest wymagany i musi byc liczba."))
+        }
+        val odometer = odometerRaw.replace(',', '.').toDoubleOrNull()
+            ?: return Result.failure(IllegalArgumentException("Stan licznika jest wymagany i musi byc liczba."))
         if (odometer < 0) {
             return Result.failure(IllegalArgumentException("Stan licznika nie moze byc ujemny."))
         }
@@ -12,6 +18,9 @@ object RefuelDraftValidator {
         val liters = if (litersRaw.isBlank()) {
             null
         } else {
+            if (!decimalPattern.matches(litersRaw)) {
+                return Result.failure(IllegalArgumentException("Ilosc paliwa musi byc liczba."))
+            }
             litersRaw.replace(',', '.').toDoubleOrNull()
                 ?: return Result.failure(IllegalArgumentException("Ilosc paliwa musi byc liczba."))
         }
@@ -28,4 +37,3 @@ object RefuelDraftValidator {
         )
     }
 }
-

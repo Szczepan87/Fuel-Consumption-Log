@@ -48,8 +48,8 @@ class SqlDelightCarRepository(
                     engine_capacity_cm3 = input.engineCapacityCm3.toLong(),
                     horse_power = input.horsePower.toLong(),
                     registration_number = input.registrationNumber,
-                    initial_mileage_km = input.mileageKm.toLong(),
-                    mileage_km = input.mileageKm.toLong(),
+                    initial_mileage_km = input.mileageKm,
+                    mileage_km = input.mileageKm,
                 )
             }
         }
@@ -62,7 +62,7 @@ class SqlDelightCarRepository(
                     car_id = carId,
                     created_at_epoch_millis = currentTimeMillis(),
                     fuel_liters = input.fuelLiters,
-                    odometer_km = input.odometerKm.toLong(),
+                    odometer_km = input.odometerKm,
                 )
 
                 updateCarMileageIfNeeded(carId = carId, odometerKm = input.odometerKm)
@@ -75,7 +75,7 @@ class SqlDelightCarRepository(
             withContext(Dispatchers.Default) {
                 queries.updateRefuel(
                     fuel_liters = input.fuelLiters,
-                    odometer_km = input.odometerKm.toLong(),
+                    odometer_km = input.odometerKm,
                     id = refuelId,
                 )
 
@@ -84,10 +84,10 @@ class SqlDelightCarRepository(
         }
     }
 
-    private fun updateCarMileageIfNeeded(carId: Long, odometerKm: Int) {
+    private fun updateCarMileageIfNeeded(carId: Long, odometerKm: Double) {
         val car = queries.selectCarById(id = carId).executeAsOneOrNull() ?: return
-        if (odometerKm > car.mileage_km.toInt()) {
-            queries.updateCarMileage(mileage_km = odometerKm.toLong(), id = carId)
+        if (odometerKm > car.mileage_km) {
+            queries.updateCarMileage(mileage_km = odometerKm, id = carId)
         }
     }
 
@@ -99,8 +99,8 @@ class SqlDelightCarRepository(
             engineCapacityCm3 = row.engine_capacity_cm3.toInt(),
             horsePower = row.horse_power.toInt(),
             registrationNumber = row.registration_number,
-            initialMileageKm = row.initial_mileage_km.toInt(),
-            mileageKm = row.mileage_km.toInt(),
+            initialMileageKm = row.initial_mileage_km,
+            mileageKm = row.mileage_km,
         )
     }
 
@@ -110,9 +110,8 @@ class SqlDelightCarRepository(
             carId = row.car_id,
             createdAtEpochMillis = row.created_at_epoch_millis,
             fuelLiters = row.fuel_liters,
-            odometerKm = row.odometer_km.toInt(),
+            odometerKm = row.odometer_km,
         )
     }
 }
-
 

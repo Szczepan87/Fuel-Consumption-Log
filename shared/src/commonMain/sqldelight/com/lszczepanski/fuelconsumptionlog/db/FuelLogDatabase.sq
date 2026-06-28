@@ -5,8 +5,8 @@ CREATE TABLE cars (
     engine_capacity_cm3 INTEGER NOT NULL,
     horse_power INTEGER NOT NULL,
     registration_number TEXT NOT NULL UNIQUE,
-    initial_mileage_km INTEGER NOT NULL,
-    mileage_km INTEGER NOT NULL
+    initial_mileage_km REAL NOT NULL,
+    mileage_km REAL NOT NULL
 );
 
 CREATE TABLE refuel_entries (
@@ -14,7 +14,7 @@ CREATE TABLE refuel_entries (
     car_id INTEGER NOT NULL REFERENCES cars(id) ON DELETE CASCADE,
     created_at_epoch_millis INTEGER NOT NULL,
     fuel_liters REAL,
-    odometer_km INTEGER NOT NULL
+    odometer_km REAL NOT NULL
 );
 
 selectAllCars:
@@ -74,4 +74,3 @@ UPDATE refuel_entries
 SET fuel_liters = ?,
     odometer_km = ?
 WHERE id = ?;
-

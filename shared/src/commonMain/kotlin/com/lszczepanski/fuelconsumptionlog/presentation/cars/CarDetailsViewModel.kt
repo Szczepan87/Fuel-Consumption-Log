@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 
 data class CarDetailsUiState(
     val car: Car? = null,
-    val initialMileageKm: Int? = null,
+    val initialMileageKm: Double? = null,
     val refuels: List<RefuelEntry> = emptyList(),
     val averageConsumption: Double? = null,
     val isDialogOpen: Boolean = false,
@@ -191,7 +191,7 @@ class CarDetailsViewModel(
 
     private fun calculateAverageConsumption(
         refuels: List<RefuelEntry>,
-        initialMileageKm: Int?,
+        initialMileageKm: Double?,
     ): Double? {
         val completed = refuels
             .filter { it.fuelLiters != null }
@@ -199,13 +199,13 @@ class CarDetailsViewModel(
 
         if (completed.isEmpty()) return null
 
-        val baseMileage = initialMileageKm ?: 0
+        val baseMileage = initialMileageKm ?: 0.0
         val distanceKm = completed.last().odometerKm - baseMileage
         if (distanceKm <= 0) return null
 
         val totalLiters = completed.sumOf { it.fuelLiters ?: 0.0 }
 
-        return (totalLiters * 100.0) / distanceKm.toDouble()
+        return (totalLiters * 100.0) / distanceKm
     }
 
     private fun latestRefuel(refuels: List<RefuelEntry>): RefuelEntry? {
@@ -216,4 +216,3 @@ class CarDetailsViewModel(
         return latestRefuel(refuels)?.fuelLiters != null || refuels.isEmpty()
     }
 }
-

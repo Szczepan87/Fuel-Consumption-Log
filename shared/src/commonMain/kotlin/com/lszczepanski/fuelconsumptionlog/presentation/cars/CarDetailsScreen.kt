@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.lszczepanski.fuelconsumptionlog.data.local.CarRepository
@@ -38,6 +40,7 @@ import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelDraft
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelEntry
 import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelInput
 import com.lszczepanski.fuelconsumptionlog.util.formatEpochMillis
+import com.lszczepanski.fuelconsumptionlog.util.formatDecimal
 import kotlin.math.round
 
 @Composable
@@ -173,7 +176,7 @@ private fun CarHeaderCard(
     registration: String,
     engineCapacity: Int,
     horsePower: Int,
-    mileageKm: Int,
+    mileageKm: Double,
     averageConsumption: Double?,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -181,7 +184,7 @@ private fun CarHeaderCard(
             Text("$brand $model", style = MaterialTheme.typography.titleLarge)
             Text("Rejestracja: $registration")
             Text("Silnik: ${engineCapacity} cm3, ${horsePower} KM")
-            Text("Aktualny przebieg: ${mileageKm} km")
+            Text("Aktualny przebieg: ${formatDecimal(mileageKm)} km")
             val avgText = averageConsumption?.let { "${round(it * 10.0) / 10.0} l/100 km" } ?: "Brak danych"
             Text("Srednie spalanie: $avgText", fontWeight = FontWeight.SemiBold)
         }
@@ -195,7 +198,7 @@ private fun RefuelRow(
     isEditable: Boolean,
     onClick: () -> Unit,
 ) {
-    val liters = refuel.fuelLiters?.let { "$it l" } ?: "do uzupelnienia"
+    val liters = refuel.fuelLiters?.let { "${formatDecimal(it)} l" } ?: "do uzupelnienia"
     val consumptionText = consumptionPer100Km?.let { "${round(it * 10.0) / 10.0} l/100 km" } ?: "-"
 
     Card(
@@ -213,7 +216,7 @@ private fun RefuelRow(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
                 Text(formatEpochMillis(refuel.createdAtEpochMillis), fontWeight = FontWeight.SemiBold)
                 Text("Paliwo: $liters")
-                Text("Licznik: ${refuel.odometerKm} km")
+                Text("Licznik: ${formatDecimal(refuel.odometerKm)} km")
                 if (isEditable) {
                     Text("Mozesz edytowac litry i przebieg", style = MaterialTheme.typography.bodySmall)
                 }
@@ -229,7 +232,7 @@ private fun RefuelRow(
 
 private fun calculateRefuelConsumptions(
     refuels: List<RefuelEntry>,
-    initialMileageKm: Int?,
+    initialMileageKm: Double?,
 ): Map<Long, Double> {
     val completed = refuels
         .filter { it.fuelLiters != null }
@@ -238,13 +241,13 @@ private fun calculateRefuelConsumptions(
     if (completed.isEmpty()) return emptyMap()
 
     val result = mutableMapOf<Long, Double>()
-    var previousOdometer = initialMileageKm ?: 0
+    var previousOdometer = initialMileageKm ?: 0.0
 
     for (refuel in completed) {
         val distanceKm = refuel.odometerKm - previousOdometer
         val liters = refuel.fuelLiters ?: continue
         if (distanceKm > 0) {
-            result[refuel.id] = (liters * 100.0) / distanceKm.toDouble()
+            result[refuel.id] = (liters * 100.0) / distanceKm
         }
         previousOdometer = refuel.odometerKm
     }
@@ -271,14 +274,16 @@ private fun RefuelDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = draft.fuelLiters,
-                    onValueChange = { onDraftChanged(draft.copy(fuelLiters = it)) },
+                    onValueChange = { onDraftChanged(draft.copy(fuelLiters = filterDecimalInput(it))) },
                     label = { Text("Paliwo (l)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                 )
                 OutlinedTextField(
                     value = draft.odometerKm,
-                    onValueChange = { onDraftChanged(draft.copy(odometerKm = it)) },
+                    onValueChange = { onDraftChanged(draft.copy(odometerKm = filterDecimalInput(it))) },
                     label = { Text("Stan licznika (km)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                 )
                 Text(
@@ -324,7 +329,7 @@ private fun CarHeaderCardPreview() {
             registration = "KR 1234A",
             engineCapacity = 1968,
             horsePower = 150,
-            mileageKm = 182300,
+            mileageKm = 182300.0,
             averageConsumption = 6.1,
         )
     }
@@ -340,7 +345,7 @@ private fun RefuelRowPreview() {
                 carId = 1,
                 createdAtEpochMillis = 1_780_000_000_000,
                 fuelLiters = 42.7,
-                odometerKm = 182300,
+                odometerKm = 182300.0,
             ),
             consumptionPer100Km = 6.3,
             isEditable = true,
@@ -378,8 +383,8 @@ private fun CarDetailsScreenPreview() {
         engineCapacityCm3 = 1968,
         horsePower = 150,
         registrationNumber = "KR 1234A",
-        initialMileageKm = 180000,
-        mileageKm = 182300,
+        initialMileageKm = 180000.0,
+        mileageKm = 182300.0,
     )
     val previewRefuels = listOf(
         RefuelEntry(
@@ -387,21 +392,21 @@ private fun CarDetailsScreenPreview() {
             carId = 1,
             createdAtEpochMillis = 1_780_010_000_000,
             fuelLiters = 40.1,
-            odometerKm = 182300,
+            odometerKm = 182300.0,
         ),
         RefuelEntry(
             id = 2,
             carId = 1,
             createdAtEpochMillis = 1_779_800_000_000,
             fuelLiters = null,
-            odometerKm = 181900,
+            odometerKm = 181900.0,
         ),
         RefuelEntry(
             id = 1,
             carId = 1,
             createdAtEpochMillis = 1_779_500_000_000,
             fuelLiters = 41.6,
-            odometerKm = 181500,
+            odometerKm = 181500.0,
         ),
     )
 
@@ -443,3 +448,13 @@ private fun CarDetailsScreenPreview() {
     }
 }
 
+private fun filterDecimalInput(value: String): String {
+    val filtered = value.filter { it.isDigit() || it == '.' || it == ',' }
+    val separatorIndex = filtered.indexOfFirst { it == '.' || it == ',' }
+    if (separatorIndex == -1) return filtered
+
+    val integerPart = filtered.substring(0, separatorIndex)
+    val separator = filtered[separatorIndex]
+    val fractionalPart = filtered.substring(separatorIndex + 1).filter(Char::isDigit)
+    return integerPart + separator + fractionalPart
+}
