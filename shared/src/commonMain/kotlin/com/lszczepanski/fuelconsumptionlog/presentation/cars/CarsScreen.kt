@@ -32,9 +32,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.lszczepanski.fuelconsumptionlog.data.local.CarRepository
 import com.lszczepanski.fuelconsumptionlog.domain.model.Car
 import com.lszczepanski.fuelconsumptionlog.domain.model.CarDraft
+import com.lszczepanski.fuelconsumptionlog.domain.model.CarInput
+import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelEntry
+import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelInput
 import com.lszczepanski.fuelconsumptionlog.util.formatDecimal
 
 @Composable
@@ -247,4 +252,103 @@ private fun filterDecimalInput(value: String): String {
     val separator = filtered[separatorIndex]
     val fractionalPart = filtered.substring(separatorIndex + 1).filter(Char::isDigit)
     return integerPart + separator + fractionalPart
+}
+
+@Preview
+@Composable
+private fun CarRowPreview() {
+    MaterialTheme {
+        CarRow(
+            car = Car(
+                id = 1,
+                brand = "Skoda",
+                model = "Octavia",
+                engineCapacityCm3 = 1968,
+                horsePower = 150,
+                registrationNumber = "KR 1234A",
+                initialMileageKm = 180000.0,
+                mileageKm = 182300.0,
+            ),
+            onClick = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun AddCarDialogPreview() {
+    MaterialTheme {
+        AddCarDialog(
+            draft = CarDraft(
+                brand = "Toyota",
+                model = "Corolla",
+                engineCapacityCm3 = "1798",
+                horsePower = "140",
+                registrationNumber = "KR1234A",
+                mileageKm = "145300",
+            ),
+            errorMessage = null,
+            isSaving = false,
+            onDismiss = {},
+            onDraftChanged = {},
+            onSave = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun CarsScreenPreview() {
+    val previewCars = listOf(
+        Car(
+            id = 1,
+            brand = "Skoda",
+            model = "Octavia",
+            engineCapacityCm3 = 1968,
+            horsePower = 150,
+            registrationNumber = "KR 1234A",
+            initialMileageKm = 180000.0,
+            mileageKm = 182300.0,
+        ),
+        Car(
+            id = 2,
+            brand = "Toyota",
+            model = "Corolla",
+            engineCapacityCm3 = 1798,
+            horsePower = 140,
+            registrationNumber = "KR 9876B",
+            initialMileageKm = 143000.0,
+            mileageKm = 145300.0,
+        ),
+    )
+
+    val previewRepository = remember {
+        object : CarRepository {
+            override suspend fun getCars(): List<Car> = previewCars
+
+            override suspend fun getCarById(carId: Long): Car? = previewCars.firstOrNull { it.id == carId }
+
+            override suspend fun getRefuelsByCarId(carId: Long): List<RefuelEntry> = emptyList()
+
+            override suspend fun addCar(input: CarInput): Result<Unit> = Result.success(Unit)
+
+            override suspend fun addRefuel(carId: Long, input: RefuelInput): Result<Unit> = Result.success(Unit)
+
+            override suspend fun updateRefuel(carId: Long, refuelId: Long, input: RefuelInput): Result<Unit> = Result.success(Unit)
+        }
+    }
+
+    val previewViewModel = remember {
+        CarsViewModel(
+            repository = previewRepository,
+        )
+    }
+
+    MaterialTheme {
+        CarsScreen(
+            viewModel = previewViewModel,
+            onCarSelected = {},
+            onOpenSettings = {},
+        )
+    }
 }
