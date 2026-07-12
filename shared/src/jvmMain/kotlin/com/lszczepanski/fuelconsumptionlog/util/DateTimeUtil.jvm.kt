@@ -12,3 +12,8 @@ actual fun formatEpochMillis(epochMillis: Long): String {
     return formatter.format(instant.atZone(ZoneId.systemDefault()))
 }
 
+actual fun formatMonthYearEpochMillis(epochMillis: Long): String {
+    val formatter = DateTimeFormatter.ofPattern("LLLL yyyy")
+    val instant = Instant.ofEpochMilli(epochMillis)
+    return formatter.format(instant.atZone(ZoneId.systemDefault()))
+}

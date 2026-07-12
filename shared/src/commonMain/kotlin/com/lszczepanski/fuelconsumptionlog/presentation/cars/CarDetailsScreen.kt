@@ -42,6 +42,7 @@ import com.lszczepanski.fuelconsumptionlog.domain.model.RefuelInput
 import com.lszczepanski.fuelconsumptionlog.domain.model.UnitSystem
 import com.lszczepanski.fuelconsumptionlog.util.formatEpochMillis
 import com.lszczepanski.fuelconsumptionlog.util.formatDecimal
+import com.lszczepanski.fuelconsumptionlog.util.formatMonthYearHeader
 import kotlin.math.round
 
 @Composable
@@ -65,6 +66,9 @@ fun CarDetailsScreen(
             refuels = uiState.refuels,
             initialMileageKm = uiState.initialMileageKm,
         )
+    }
+    val refuelHistoryItems = remember(uiState.refuels) {
+        buildRefuelHistoryItems(uiState.refuels)
     }
 
     Scaffold(
@@ -143,15 +147,24 @@ fun CarDetailsScreen(
                         Text("Brak tankowan. Dodaj pierwsze tankowanie przyciskiem +.")
                     }
                 } else {
-                    items(uiState.refuels, key = { it.id }) { refuel ->
-                        val isEditable = refuel.id == latestRefuelId
-                        RefuelRow(
-                            refuel = refuel,
-                            consumptionPer100Km = refuelConsumptions[refuel.id],
-                            isEditable = isEditable,
-                            unitSystem = unitSystem,
-                            onClick = { viewModel.onEditRefuelClick(refuel) },
-                        )
+                    items(refuelHistoryItems, key = { it.key }) { item ->
+                        when (item) {
+                            is RefuelHistoryItem.MonthSeparator -> {
+                                RefuelMonthSeparator(label = item.label)
+                            }
+
+                            is RefuelHistoryItem.Entry -> {
+                                val refuel = item.refuel
+                                val isEditable = refuel.id == latestRefuelId
+                                RefuelRow(
+                                    refuel = refuel,
+                                    consumptionPer100Km = refuelConsumptions[refuel.id],
+                                    isEditable = isEditable,
+                                    unitSystem = unitSystem,
+                                    onClick = { viewModel.onEditRefuelClick(refuel) },
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -171,6 +184,53 @@ fun CarDetailsScreen(
             onSave = viewModel::onSaveRefuel,
         )
     }
+}
+
+@Composable
+private fun RefuelMonthSeparator(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+private sealed interface RefuelHistoryItem {
+    val key: String
+
+    data class MonthSeparator(
+        override val key: String,
+        val label: String,
+    ) : RefuelHistoryItem
+
+    data class Entry(
+        val refuel: RefuelEntry,
+    ) : RefuelHistoryItem {
+        override val key: String = "refuel-${refuel.id}"
+    }
+}
+
+private fun buildRefuelHistoryItems(refuels: List<RefuelEntry>): List<RefuelHistoryItem> {
+    if (refuels.isEmpty()) return emptyList()
+
+    val result = mutableListOf<RefuelHistoryItem>()
+    var previousMonthLabel: String? = null
+
+    for (refuel in refuels) {
+        val monthLabel = formatMonthYearHeader(refuel.createdAtEpochMillis)
+        if (monthLabel != previousMonthLabel) {
+            result += RefuelHistoryItem.MonthSeparator(
+                key = "month-${refuel.id}",
+                label = monthLabel,
+            )
+            previousMonthLabel = monthLabel
+        }
+
+        result += RefuelHistoryItem.Entry(refuel)
+    }
+
+    return result
 }
 
 @Composable
@@ -430,7 +490,7 @@ private fun CarDetailsScreenPreview() {
         RefuelEntry(
             id = 1,
             carId = 1,
-            createdAtEpochMillis = 1_779_500_000_000,
+            createdAtEpochMillis = 1_776_600_000_000,
             fuelLiters = 41.6,
             odometerKm = 181500.0,
         ),
